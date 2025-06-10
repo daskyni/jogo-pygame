@@ -19,7 +19,7 @@ class Player(pygame.sprite.Sprite):
         self.last_sprite_number = 7
 
         # fator de escala para a sprite do personagem
-        self.scale_factor = 2
+        self.scale_factor = 3
 
         # carrega os frames da animacao de andar
         self.walk_frames = []
