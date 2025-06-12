@@ -1,25 +1,12 @@
+import math
 import pygame
 import random
 from main import SCREEN_WIDTH, SCREEN_HEIGHT
 
-GHOST_CONTACT_DAMAGE = 10 # Dano que o fantasma causa ao player ao contato
-
-# Constantes para a barra de vida do fantasma
-HEALTH_BAR_WIDTH = 30
-HEALTH_BAR_HEIGHT = 5
-HEALTH_BAR_OFFSET_Y = 8  # Distância vertical acima da imagem do fantasma
-HEALTH_BAR_BG_COLOR = (150, 0, 0)    # Vermelho escuro para o fundo
-HEALTH_BAR_FG_COLOR = (0, 255, 0)    # Verde para a vida atual
-HEALTH_BAR_BORDER_COLOR = (0, 0, 0)  # Preto para a borda
-
-# Constantes para o efeito de flash ao ser atingido
-HIT_FLASH_DURATION = 100  # ms, duração do flash
-HIT_FLASH_STRENGTH = (150, 150, 150) # Cor a ser adicionada para o flash (branco suave)
-
-GHOST_AGGRO_RADIUS = 200 # Raio em que o fantasma começa a perseguir
-# Distância mínima para o fantasma parar.
-# Este valor deve ser ajustado com base nas dimensões dos sprites do jogador e do fantasma
-# para garantir que seus retângulos de colisão não se sobreponham quando o fantasma para.
+# Constantes para o fantasma
+GHOST_CONTACT_DAMAGE = 1
+GHOST_TOTAL_LIVES = 1
+GHOST_AGGRO_RADIUS = 200 # Raio em que o fantasma começa a perseguir o Player
 MIN_PLAYER_DISTANCE = 3 # Ajustado para evitar dano "de longe"
 
 # Constantes para repulsão entre fantasmas
@@ -27,16 +14,57 @@ MIN_GHOST_DISTANCE_REPEL = 50  # Distância para começar a repelir (ajuste conf
 GHOST_REPEL_STRENGTH_VALUE = 0.5 # Força da repulsão (pequeno valor para evitar movimentos bruscos)
 
 class Ghost(pygame.sprite.Sprite):
-    def __init__(self, player, ghost_images, all_ghosts_group):
+    def __init__(self, player, all_ghosts_group):
         super().__init__()
-        self.images = ghost_images
-        self.image_index = 0
-        self.image = self.images[self.image_index]
 
+        # sprites de flutuar
+        self.first_fluctuating_sprite_number = 0
+        self.last_fluctuating_sprite_number = 3
+
+        # fator de escala para sprite do fantasma
+        self.scale_factor = 3
+
+        self.fluctuate_frames = []
+        for i in range(self.first_fluctuating_sprite_number, self.last_fluctuating_sprite_number):
+            img_path = f"./sprites/personagens/fantasma/flutuando/fantasma_flutuando_{i}.png"
+            original_img = pygame.image.load(img_path).convert_alpha()
+            # escala a imagem
+            scaled_img = pygame.transform.scale(
+                original_img,
+                (original_img.get_width() * self.scale_factor,
+                 original_img.get_height() * self.scale_factor)
+            )
+            self.fluctuate_frames.append(scaled_img)
+
+        # variaveis de controle de animacao
+        self.current_frame = 0
+        self.animation_speed = 0.3
+        self.last_update = 0
+
+        # imagem inicial
+        self.image = self.fluctuate_frames[self.current_frame]
         self.rect = self.image.get_rect()
-        self.rect.center = (random.randint(100, 700), random.randint(100, 500))
+        
+        # define onde o fantasma vai nascer aleatoriamente
+        side = random.choice(['top', 'bottom', 'left', 'right'])
+        if side == 'top':
+            x = random.randint(0, SCREEN_WIDTH)
+            y = 0
+        elif side == 'bottom':
+            x = random.randint(0, SCREEN_WIDTH)
+            y = SCREEN_HEIGHT
+        elif side == 'left':
+            x = 0
+            y = random.randint(0, SCREEN_HEIGHT)
+        else:  # right
+            x = SCREEN_WIDTH
+            y = random.randint(0, SCREEN_HEIGHT)
 
-        self.speed = 1.2
+        self.rect.center = (x, y)
+
+        # velocidade de movimento
+        self.speed = 0.5
+
         self.direction = pygame.Vector2(random.uniform(-1, 1), random.uniform(-1, 1)).normalize()
         self.player = player
         self.all_ghosts_group = all_ghosts_group # Grupo de todos os fantasmas para checar repulsão
@@ -44,67 +72,19 @@ class Ghost(pygame.sprite.Sprite):
         self.timer = 0
         self.change_direction_time = random.randint(60, 120)
 
-        self.animation_timer = 0
-        self.animation_speed = 10
-
-        self.max_health = 100
-        self.health = 100
-        self.invulnerable = False
-        self.invulnerable_time = 1000  # em milissegundos
-        self.last_hit_time = 0
-        self.xp_reward = 25 # Quantidade de XP que este fantasma concede
-        
-        self.is_hit_flashing = False # Controla se o fantasma está no efeito de flash de acerto
-        self.hit_flash_start_time = 0
-
+        self.total_lives = GHOST_TOTAL_LIVES
+        self.lives_remaining = self.total_lives
+    
     def update(self):
-        now = pygame.time.get_ticks()
+        self.animate_fluctuate()
 
-        # 1. Atualiza o índice da animação
-        self.animation_timer += 1
-        if self.animation_timer >= self.animation_speed:
-            self.image_index = (self.image_index + 1) % len(self.images)
-            self.animation_timer = 0
-        
-        # 2. Pega a imagem base da animação para este frame
-        base_image_for_frame = self.images[self.image_index]
-        
-        # 3. Aplica efeitos visuais
-        # Começa com a imagem base
-        final_image = base_image_for_frame
-
-        # Efeito de "hit flash" (branco)
-        if self.is_hit_flashing:
-            if now - self.hit_flash_start_time < HIT_FLASH_DURATION:
-                flash_image = base_image_for_frame.copy()
-                flash_image.fill(HIT_FLASH_STRENGTH, special_flags=pygame.BLEND_RGB_ADD)
-                final_image = flash_image # O flash tem prioridade sobre a imagem base
-            else:
-                self.is_hit_flashing = False # Desativa o flash após a duração
-
-        # Efeito de invulnerabilidade (piscar transparente)
-        # Este efeito pode sobrescrever a imagem (mesmo que tenha flash) para torná-la transparente
-        if self.invulnerable:
-            if (now - self.last_hit_time) % 200 < 100: # Fase "invisível" do piscar
-                transparent_surface = pygame.Surface(base_image_for_frame.get_size(), pygame.SRCALPHA)
-                transparent_surface.fill((0,0,0,0)) # Totalmente transparente
-                final_image = transparent_surface
-            # Na fase "visível" do piscar, final_image já é a correta (base ou com flash)
-        
-        self.image = final_image
-
-        # 4. Verifica se deve parar de ser invulnerável (após todos os efeitos visuais do frame)
-        if self.invulnerable and now - self.last_hit_time > self.invulnerable_time:
-            self.invulnerable = False
-            # self.is_hit_flashing já terá sido desativado pelo seu próprio timer
-        
         # Lógica de Comportamento (Direção e Velocidade)
         distance_vector = pygame.Vector2(self.player.rect.center) - pygame.Vector2(self.rect.center)
         # Calcula a distância, tratando o caso de vetor zero para evitar erros com .length()
         distance_length = distance_vector.length() if distance_vector.length_squared() > 0 else 0
 
         # Define a velocidade base do fantasma dependendo se o jogador está andando
-        current_speed = 1.5 if self.player.walking else 0.8 # Ajustado para ser mais lento que o jogador
+        current_speed = 1.5 if self.player.walking else 0.8 # ajustado para fantasma ser mais lento que o jogador
 
         # Comportamento de Perseguição / Proximidade
         if distance_length < GHOST_AGGRO_RADIUS:  # Dentro do raio de agressão
@@ -166,41 +146,26 @@ class Ghost(pygame.sprite.Sprite):
         # verificar colisão com player
         if self.rect.colliderect(self.player.rect):
             # O fantasma causa dano ao jogador ao tocá-lo.
-            # A lógica de invulnerabilidade do jogador já está em player.take_damage()
+            # A lógica de invulnerabilidade do jogador esta em player.take_damage()
             self.player.take_damage(GHOST_CONTACT_DAMAGE, self) # Passa o fantasma como fonte do dano
 
+    def animate_fluctuate(self):
+        now = pygame.time.get_ticks()
+
+        # verifica se o tempo que passou é maior do que o tempo que cada frame deve ficar na tela
+        if now - self.last_update > self.animation_speed * 1000:
+            # atualiza o tempo e o frame
+            self.last_update = now
+            self.current_frame = (self.current_frame + 1) % len(self.fluctuate_frames) # realiza o loop dos frames
+        
+            # pega o frame base
+            base_image = self.fluctuate_frames[self.current_frame]
+            self.image = base_image
+
     def take_damage(self, amount):
-        if not self.invulnerable: # Só toma dano e mostra efeito se não estiver invulnerável
-            self.health -= amount
-            current_time = pygame.time.get_ticks()
-            self.invulnerable = True
-            self.last_hit_time = current_time
+        self.lives_remaining -= amount
+        if self.lives_remaining <= 0:
+            self.kill()  # remove o fantasma do grupo e da tela
 
-            self.is_hit_flashing = True # Ativa o flash de acerto
-            self.hit_flash_start_time = current_time # Pode usar o mesmo tempo do início da invulnerabilidade
-
-            if self.health <= 0:
-                self.player.gain_xp(self.xp_reward) # Concede XP ao jogador
-                self.kill()  # remove o fantasma do grupo e da tela
-
-    def draw_health_bar(self, surface):
-        # Desenha a barra de vida apenas se o fantasma estiver vivo e com vida abaixo do máximo
-        if self.health > 0 and self.health < self.max_health:
-            health_ratio = self.health / self.max_health
-
-            # Posição da barra de vida
-            bar_x = self.rect.centerx - HEALTH_BAR_WIDTH // 2
-            bar_y = self.rect.top - HEALTH_BAR_OFFSET_Y - HEALTH_BAR_HEIGHT
-
-            # Retângulo da borda
-            border_rect = pygame.Rect(bar_x - 1, bar_y - 1, HEALTH_BAR_WIDTH + 2, HEALTH_BAR_HEIGHT + 2)
-            pygame.draw.rect(surface, HEALTH_BAR_BORDER_COLOR, border_rect)
-
-            # Retângulo de fundo da barra de vida
-            bg_bar_rect = pygame.Rect(bar_x, bar_y, HEALTH_BAR_WIDTH, HEALTH_BAR_HEIGHT)
-            pygame.draw.rect(surface, HEALTH_BAR_BG_COLOR, bg_bar_rect)
-
-            # Retângulo da vida atual
-            current_health_width = int(HEALTH_BAR_WIDTH * health_ratio)
-            health_bar_rect = pygame.Rect(bar_x, bar_y, current_health_width, HEALTH_BAR_HEIGHT)
-            pygame.draw.rect(surface, HEALTH_BAR_FG_COLOR, health_bar_rect)
+    def draw(self, surface):
+        surface.blit(self.image, self.rect)

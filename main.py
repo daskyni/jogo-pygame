@@ -7,12 +7,10 @@ FPS = 60
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 800
 
-PLAYER_ATTACK_DAMAGE = 35 # Dano que o player causa aos fantasmas
-
 if __name__ == "__main__":
-    
-    from ghosts import Ghost # Movido para dentro do if __name__
+
     # importa classes
+    from ghosts import Ghost
     from player import Player
 
     # incia o pygame
@@ -20,7 +18,7 @@ if __name__ == "__main__":
 
     # definicoes gerais da screen
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-    pygame.display.set_caption("The Reaper Game")
+    pygame.display.set_caption("O Jogo do Ceifador")
     background_image_path = "./sprites/mapa/mapa_completo.png"
     background_image = pygame.image.load(background_image_path).convert()
     # aplica a transformação de scale para adequar o background ao tamanho da screen
@@ -46,46 +44,35 @@ if __name__ == "__main__":
         font_title = pygame.font.Font(None, 76) # Ajustado para o fallback
         font_instruction = pygame.font.Font(None, 42) # Ajustado para o fallback
 
+    def inicializa_jogo(player, ghosts_group):
+        player.lives_remaining = player.total_lives
+        player.life_count_atual = player.life_counters[player.lives_remaining]
+        player.walking = False
+        player.is_attacking = False
+        player.direction_x = 0
+        player.direction_y = 0
+        player.invulnerable = False
+        player.rect.center = (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
+        for ghost in ghosts_group:
+            ghost.kill()
+
     # Estados do Jogo
     TELA_INICIAL = "TELA_INICIAL"
     JOGANDO = "JOGANDO"
     GAME_OVER = "GAME_OVER"
     game_state = TELA_INICIAL
 
-    # Função para (re)inicializar o mundo do jogo (jogador e fantasmas)
-    def inicializar_mundo_jogo(p_obj, all_s_group, g_s_group, g_imgs_list, num_fantasmas=3):
-        p_obj.health = p_obj.max_health
-        p_obj.xp = 0
-        p_obj.level = 1
-        p_obj.xp_to_next_level = p_obj.base_xp_to_next_level
-        p_obj.rect.center = (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
-        p_obj.invulnerable = False
-        p_obj.is_attacking = False
-        p_obj.direction_x = 0
-        p_obj.direction_y = 0
-        p_obj.walking = False
+    # eventos
+    GHOST_SPAWN_EVENT = pygame.USEREVENT + 1
+    pygame.time.set_timer(GHOST_SPAWN_EVENT, 2000)  # spawn de fantasmas a cada 2 segundos
 
-        for fantasma_existente in g_s_group:
-            fantasma_existente.kill() # Remove dos grupos all_s_group e g_s_group
-
-        for _ in range(num_fantasmas):
-            novo_fantasma = Ghost(p_obj, g_imgs_list, g_s_group) # Passa o grupo de fantasmas
-            all_s_group.add(novo_fantasma)
-            g_s_group.add(novo_fantasma)
-
-    ghost_images = []
-    for i in range(0, 3):
-        img = pygame.image.load(f"./sprites/personagens/fantasma/flutuando/fantasma_flutuando_{i}.png").convert_alpha()
-        img = pygame.transform.scale(img, (img.get_width() * 2, img.get_height() * 2))
-        ghost_images.append(img)
+    # posicao do life count
+    POSICAO_X_LIFE_COUNT = 50
+    POSICAO_Y_LIFE_COUNT = 50
 
     # adiciona as sprites
     player = Player()
-    all_sprites = pygame.sprite.Group()
     ghosts = pygame.sprite.Group()
-    
-    # Adiciona o jogador ao grupo principal de sprites (apenas uma vez)
-    all_sprites.add(player) 
 
     # clock para controlar o framerate
     clock = pygame.time.Clock()
@@ -95,25 +82,26 @@ if __name__ == "__main__":
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 running = False
-            
+            elif event.type == GHOST_SPAWN_EVENT:
+                new_ghost = Ghost(player, ghosts)
+                ghosts.add(new_ghost)
             if game_state == TELA_INICIAL:
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_RETURN:
-                        inicializar_mundo_jogo(player, all_sprites, ghosts, ghost_images, 3)
+                        inicializa_jogo(player, ghosts)
                         game_state = JOGANDO
             elif game_state == JOGANDO:
                 player.handle_input(event)
             elif game_state == GAME_OVER:
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_RETURN: # Reiniciar
-                        inicializar_mundo_jogo(player, all_sprites, ghosts, ghost_images, 3)
+                        inicializa_jogo(player, ghosts)
                         game_state = JOGANDO
                     elif event.key == pygame.K_ESCAPE: # Sair
                         running = False
 
-        # Lógica e Desenho baseados no estado do jogo
+        # logica e desenho baseados no estado do jogo
         if game_state == TELA_INICIAL:
-            # screen.fill((20, 20, 50)) # Fundo azul escuro - Removido
             screen.blit(scaled_initial_background, initial_background_rect) 
             instrucao_surface = font_instruction.render("Pressione ENTER para começar", True, (38, 56, 48))
 
@@ -124,39 +112,22 @@ if __name__ == "__main__":
         elif game_state == JOGANDO:
             # coloca o background na tela
             screen.blit(scaled_background, background_rect)
-
             # atualiza e desenha o grupo de sprites
-            all_sprites.update()
-            all_sprites.draw(screen)
+            player.update()
+            player.draw(screen)
 
-            # Lógica de ataque do Player
-            if player.is_attacking:
-                ghosts_hit_by_player = pygame.sprite.spritecollide(player, ghosts, False, pygame.sprite.collide_rect)
-                for ghost_hit in ghosts_hit_by_player:
-                    if not ghost_hit.invulnerable:
-                        ghost_hit.take_damage(PLAYER_ATTACK_DAMAGE)
-
-            # Exibir HP do Player
-            hp_text = font_stats.render(f"HP: {player.health}/{player.max_health}", True, (255, 255, 255))
-            screen.blit(hp_text, (10, 10))
-
-            # Exibir Nível e XP do Player
-            level_text = font_stats.render(f"Level: {player.level}", True, (255, 255, 255))
-            screen.blit(level_text, (10, 40))
-            xp_text = font_stats.render(f"XP: {player.xp}/{player.xp_to_next_level}", True, (255, 255, 255))
-            screen.blit(xp_text, (10, 70))
-
-            # Desenhar barras de vida dos fantasmas
             for ghost in ghosts:
-                ghost.draw_health_bar(screen)
+                ghost.update()
+                ghost.draw(screen)
+            # coloca a vida atual do personagem
+            screen.blit(player.life_count_atual, (POSICAO_X_LIFE_COUNT, POSICAO_Y_LIFE_COUNT))
 
             # Condição de Game Over
-            if player.health <= 0:
+            if player.lives_remaining <= 0:
                 game_state = GAME_OVER
         
         elif game_state == GAME_OVER:
-            # screen.fill((50, 20, 20)) # Fundo vermelho escuro - Removido
-            screen.blit(scaled_initial_background, initial_background_rect) # Novo fundo
+            screen.blit(scaled_initial_background, initial_background_rect)
             game_over_surface = font_title.render("GAME OVER", True, (38, 56, 48))
             instrucao_restart_surface = font_instruction.render("ENTER para reiniciar", True, (38, 56, 48))
             instrucao_sair_surface = font_stats.render("ESC para sair", True, (38, 56, 48))
@@ -169,6 +140,7 @@ if __name__ == "__main__":
             screen.blit(instrucao_restart_surface, instrucao_restart_rect)
             screen.blit(instrucao_sair_surface, instrucao_sair_rect)
 
+        
         # atualiza a tela
         pygame.display.flip()
 
