@@ -62,8 +62,23 @@ class Player(pygame.sprite.Sprite):
         # imagem inicial
         self.image = self.walk_frames[self.current_frame]
         self.rect = self.image.get_rect()
+        self.rect.topleft = (self.image.get_rect().left + 54, self.image.get_rect().top + 30)
         
         self.rect.center = (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
+
+        # criar hitbox separada (menor, só pega o corpo)
+        hitbox_width = 12 * self.scale_factor   # 12 → 36 px
+        hitbox_height = 24 * self.scale_factor  # 24 → 72 px
+        offset_x = 18 * self.scale_factor       # deslocamento lateral do corpo
+        offset_y = 10 * self.scale_factor       # deslocamento vertical do corpo
+
+        # ajusta hitbox com base na posição da imagem
+        self.hitbox = pygame.Rect(
+            self.rect.left + offset_x,
+            self.rect.top + offset_y,
+            hitbox_width,
+            hitbox_height
+        )
 
         # variaveis que controlam o estado do jogador (parado ou andando)
         self.walking = False
@@ -146,6 +161,7 @@ class Player(pygame.sprite.Sprite):
             self.image = self.walk_frames[0]
             if not self.facing_right:
                 self.image = pygame.transform.flip(self.image, True, False)
+                self.update_hitbox(True)
         
         self.base_sprite_image = self.image
 
@@ -163,6 +179,19 @@ class Player(pygame.sprite.Sprite):
                 else: # visivel por 150ms
                     self.image = self.base_sprite_image
 
+    # metodo que atualiza a hitbox com base no scale_factor
+    def update_hitbox(self, isFacingLeft):
+        offset_y = 10 * self.scale_factor
+        if isFacingLeft:
+            offset_x = 8 * self.scale_factor  # mais à esquerda
+        else:
+            offset_x = 18 * self.scale_factor  # mais à direita
+
+        self.hitbox.topleft = (
+            self.rect.left + offset_x,
+            self.rect.top + offset_y
+        )
+
     # metodo que realiza a animacao de andar do personagem
     def animate_walk(self):
         now = pygame.time.get_ticks() # pega quanto tempo se passou desde que a funcao pygame.init() foi chamada
@@ -179,8 +208,10 @@ class Player(pygame.sprite.Sprite):
             # vira a imagem se a direcao for para a esquerda
             if not self.facing_right:
                 self.image = pygame.transform.flip(base_image, True, False) # flip_x = True, flip_y = False
+                self.update_hitbox(True)
             else:
                 self.image = base_image # nao vira se estiver para a direita
+                self.update_hitbox(False)
 
     def animate_attack(self):
         now = pygame.time.get_ticks() # pega quanto tempo se passou desde que a funcao pygame.init() foi chamada
@@ -200,13 +231,16 @@ class Player(pygame.sprite.Sprite):
                     self.image = self.walk_frames[0]
                 if not self.facing_right:
                     self.image = pygame.transform.flip(self.image, True, False)
+                    self.update_hitbox(True)
                 return
 
             base_image = self.attack_frames[self.current_attack_frame]
             if not self.facing_right:
                 self.image = pygame.transform.flip(base_image, True, False)
+                self.update_hitbox(True)
             else:
-                self.image = base_image    
+                self.image = base_image
+                self.update_hitbox(False)    
 
     def take_damage(self, amount, damage_source=None):
         if not self.invulnerable:

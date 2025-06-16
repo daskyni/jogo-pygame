@@ -7,7 +7,7 @@ from main import SCREEN_WIDTH, SCREEN_HEIGHT
 GHOST_CONTACT_DAMAGE = 1
 GHOST_TOTAL_LIVES = 1
 GHOST_AGGRO_RADIUS = 200 # Raio em que o fantasma começa a perseguir o Player
-MIN_PLAYER_DISTANCE = 3 # Ajustado para evitar dano "de longe"
+MIN_PLAYER_DISTANCE = 200 # Ajustado para evitar dano "de longe"
 
 # Constantes para repulsão entre fantasmas
 MIN_GHOST_DISTANCE_REPEL = 50  # Distância para começar a repelir (ajuste conforme o tamanho do sprite)
@@ -144,7 +144,7 @@ class Ghost(pygame.sprite.Sprite):
         self.rect.clamp_ip(pygame.Rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT))
 
         # verificar colisão com player
-        if self.rect.colliderect(self.player.rect):
+        if self.rect.colliderect(self.player.hitbox):
             # O fantasma causa dano ao jogador ao tocá-lo.
             # A lógica de invulnerabilidade do jogador esta em player.take_damage()
             self.player.take_damage(GHOST_CONTACT_DAMAGE, self) # Passa o fantasma como fonte do dano

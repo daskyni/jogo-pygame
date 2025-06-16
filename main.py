@@ -115,6 +115,7 @@ if __name__ == "__main__":
             # atualiza e desenha o grupo de sprites
             player.update()
             player.draw(screen)
+            pygame.draw.rect(screen, (255, 0, 0), player.hitbox, 2) # desenha hitbox no personagem
 
             for ghost in ghosts:
                 ghost.update()
