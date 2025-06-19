@@ -1,7 +1,6 @@
 import math
 import pygame
 import random
-from main import SCREEN_WIDTH, SCREEN_HEIGHT
 
 # Constantes para o fantasma
 GHOST_CONTACT_DAMAGE = 1
@@ -12,6 +11,9 @@ MIN_PLAYER_DISTANCE = 200 # Ajustado para evitar dano "de longe"
 # Constantes para repulsão entre fantasmas
 MIN_GHOST_DISTANCE_REPEL = 50  # Distância para começar a repelir (ajuste conforme o tamanho do sprite)
 GHOST_REPEL_STRENGTH_VALUE = 0.5 # Força da repulsão (pequeno valor para evitar movimentos bruscos)
+
+SCREEN_WIDTH = 800
+SCREEN_HEIGHT = 800
 
 class Ghost(pygame.sprite.Sprite):
     def __init__(self, player, all_ghosts_group):
