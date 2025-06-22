@@ -2,6 +2,7 @@ import pygame
 from ghosts import Ghost
 from player import Player
 from projectile import Projectile
+import random
 
 # define o FPS do jogo
 FPS = 60
@@ -10,6 +11,13 @@ FPS = 60
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 800
 
+GHOST_SPAWN_POINTS = [
+    (SCREEN_WIDTH // 2, 0),               # meio do topo
+    (SCREEN_WIDTH // 2, SCREEN_HEIGHT),   # meio da base
+    (0, SCREEN_HEIGHT // 2),               # meio da esquerda
+    (SCREEN_WIDTH, SCREEN_HEIGHT // 2)    # meio da direita
+]
+
 def load_smoke_frames():
     frames = []
     for i in range(0, 10):
@@ -17,9 +25,27 @@ def load_smoke_frames():
         frames.append(img)
     return frames
 
+def load_digit_sprites(target_size=None):
+    digits = []
+    for i in range(10):
+        img = pygame.image.load(f'./sprites/tela/numeros/contador_{i}.png').convert_alpha()
+        if target_size:
+            img = pygame.transform.scale(img, target_size)
+        digits.append(img)
+    return digits
+
+
+def draw_number(surface, number, pos, digit_sprites, spacing):
+    str_num = str(number)
+    x, y = pos
+    for char in str_num:
+        digit = int(char)
+        digit_img = digit_sprites[digit]
+        surface.blit(digit_img, (x, y))
+        x += digit_img.get_width() - spacing
+
 def inicializa_jogo(player, ghosts):
     player.lives_remaining = player.total_lives
-    player.life_count_atual = player.life_counters[player.lives_remaining]
     player.walking = False
     player.is_attacking = False
     player.direction_x = 0
@@ -28,6 +54,10 @@ def inicializa_jogo(player, ghosts):
     player.rect.center = (SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2)
     for ghost in ghosts:
         ghost.kill()
+    global ghosts_killed
+    ghosts_killed = 0
+
+ghosts_killed = 0
 
 if __name__ == "__main__":
     pygame.init()
@@ -66,8 +96,26 @@ if __name__ == "__main__":
     GHOST_SPAWN_EVENT = pygame.USEREVENT + 1
     pygame.time.set_timer(GHOST_SPAWN_EVENT, 2000)
 
-    POSICAO_X_LIFE_COUNT = 20
-    POSICAO_Y_LIFE_COUNT = 20
+    icon_vida = pygame.image.load('./sprites/tela/contador_vida.png').convert_alpha()
+    icon_ghost = pygame.image.load('./sprites/tela/contador_fantasmas.png').convert_alpha()
+
+    icon_size = (70, 45)
+    icon_vida = pygame.transform.scale(icon_vida, icon_size)
+    icon_ghost = pygame.transform.scale(icon_ghost, icon_size)
+
+    POS_ICON_VIDA = (20, 70)
+    POS_NUM_VIDA = (POS_ICON_VIDA[0] + icon_size[0] + 5, POS_ICON_VIDA[1])
+
+    POS_ICON_GHOST = (20, 20)
+    POS_NUM_GHOST = (POS_ICON_GHOST[0] + icon_size[0] + 5, POS_ICON_GHOST[1])
+
+    digit_height = 40  
+    temp_img = pygame.image.load('./sprites/tela/numeros/contador_0.png').convert_alpha()
+    aspect_ratio = temp_img.get_width() / temp_img.get_height()
+    digit_width = int(digit_height * aspect_ratio)
+
+    digit_target_size = (digit_width, digit_height)
+    digit_sprites = load_digit_sprites(digit_target_size)
 
     player = Player()
     ghosts = pygame.sprite.Group()
@@ -87,7 +135,7 @@ if __name__ == "__main__":
             if event.type == pygame.QUIT:
                 running = False
             elif event.type == GHOST_SPAWN_EVENT:
-                new_ghost = Ghost(player, ghosts)
+                new_ghost = Ghost(player, ghosts, spawn_pos=random.choice(GHOST_SPAWN_POINTS))
                 ghosts.add(new_ghost)
 
             if game_state == TELA_INICIAL:
@@ -111,17 +159,29 @@ if __name__ == "__main__":
             # Disparo automático do projetil
             if current_time - last_shot_time >= shot_cooldown:
                 last_shot_time = current_time
-                proj = Projectile(player.rect.center, player.direction, smoke_frames)
+                x, y = player.rect.center
+                offset = 60  
+                if player.direction == 'right':
+                    x += offset
+                elif player.direction == 'left':
+                    x -= offset
+                elif player.direction == 'up':
+                    y -= offset
+                elif player.direction == 'down':
+                    y += offset
+                proj = Projectile((x, y), player.direction, smoke_frames)
                 projectiles.add(proj)
 
             projectiles.update()
 
             # Colisão projetil x fantasmas
             for proj in projectiles:
-                hits = pygame.sprite.spritecollide(proj, ghosts, False)
+                hits = [ghost for ghost in ghosts if ghost.rect.colliderect(proj.hitbox)]
                 if hits:
                     for ghost in hits:
                         ghost.take_damage(1)
+                        if ghost.lives_remaining <= 0:
+                            ghosts_killed += 1  # incrementa contador
                     proj.kill()
 
         # Desenha telas
@@ -134,31 +194,41 @@ if __name__ == "__main__":
         elif game_state == JOGANDO:
             screen.blit(scaled_background, background_rect)
 
-            player.update()
-            player.draw(screen)
-
             for ghost in ghosts:
                 ghost.update()
                 ghost.draw(screen)
 
+            player.update()
+            player.draw(screen)
+
             projectiles.draw(screen)
 
-            screen.blit(player.life_count_atual, (POSICAO_X_LIFE_COUNT, POSICAO_Y_LIFE_COUNT))
+            screen.blit(icon_ghost, POS_ICON_GHOST)
+            draw_number(screen, ghosts_killed, POS_NUM_GHOST, digit_sprites, 2)
+
+            screen.blit(icon_vida, POS_ICON_VIDA)
+            draw_number(screen, player.lives_remaining, POS_NUM_VIDA, digit_sprites, 2)
 
             if player.lives_remaining <= 0:
                 game_state = GAME_OVER
 
         elif game_state == GAME_OVER:
             screen.blit(scaled_initial_background, initial_background_rect)
+
             game_over_surface = font_title.render("GAME OVER", True, (38, 56, 48))
             instrucao_restart_surface = font_instruction.render("ENTER para reiniciar", True, (38, 56, 48))
             instrucao_sair_surface = font_stats.render("ESC para sair", True, (38, 56, 48))
 
+            kill_count_text = f"Você matou {ghosts_killed} fantasmas"
+            kill_count_surface = font_stats.render(kill_count_text, True, (38, 56, 48))
+
             game_over_rect = game_over_surface.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 3))
             instrucao_restart_rect = instrucao_restart_surface.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
             instrucao_sair_rect = instrucao_sair_surface.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 60))
+            kill_count_rect = kill_count_surface.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 40))
 
             screen.blit(game_over_surface, game_over_rect)
+            screen.blit(kill_count_surface, kill_count_rect)
             screen.blit(instrucao_restart_surface, instrucao_restart_rect)
             screen.blit(instrucao_sair_surface, instrucao_sair_rect)
 

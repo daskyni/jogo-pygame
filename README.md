@@ -5,5 +5,6 @@ Em O Jogo do Ceifador você controla uma entidade responsável (o Ceifador) por 
 ## Como jogar?
 Para controlar o Ceifador você utiliza os seguintes comandos:
 - A tecla ENTER para iniciar/reiniciar o jogo.
-- As setinhas para movimentar o personagem (⬅️ ⬆️ ➡️ ⬇️) para as suas respectivas direções no mapa.
+- As setinhas para movimentar o personagem (⬅️ ⬆️ ➡️ ⬇️) ou (W, A, S, D) para as suas respectivas direções no mapa.
+- O ataque é automático.
 - A tecla ESC para sair do jogo.

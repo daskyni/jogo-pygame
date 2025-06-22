@@ -30,6 +30,9 @@ class Projectile(pygame.sprite.Sprite):
         self.direction = direction
         self.image = self.smoke_sprites[self.frame_index]
         self.rect = self.image.get_rect(center=pos)
+        self.rect = self.image.get_rect(center=pos)
+
+        self.hitbox = self.rect.inflate(-self.rect.width * 0.5, -self.rect.height * 0.3)
 
     def update(self):
         # Movimento conforme direção
@@ -41,6 +44,9 @@ class Projectile(pygame.sprite.Sprite):
             self.rect.y -= self.speed
         elif self.direction == 'down':
             self.rect.y += self.speed
+        
+        # Atualiza a hitbox junto com o rect
+        self.hitbox.center = self.rect.center
 
         # Animação
         self.frame_counter += self.animation_speed

@@ -9,9 +9,6 @@ PLAYER_KNOCKBACK_DURATION = 200
 PLAYER_KNOCKBACK_SPEED = 5
 PLAYER_DAMAGE = 1
 
-TAMANHO_COMPRIMENTO_LIFE_COUNT = 150
-TAMANHO_ALTURA_LIFE_COUNT = 50
-
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 800
 
@@ -96,20 +93,6 @@ class Player(pygame.sprite.Sprite):
         self.knockback_direction = pygame.Vector2(0, 0)
 
         self.base_sprite_image = self.image
-
-        self.life_count_sprite_3 = pygame.transform.scale(pygame.image.load('./sprites/tela/vida/vida_3.png').convert_alpha(),
-                                                           (TAMANHO_COMPRIMENTO_LIFE_COUNT, TAMANHO_ALTURA_LIFE_COUNT))
-        self.life_count_sprite_2 = pygame.transform.scale(pygame.image.load('./sprites/tela/vida/vida_2.png').convert_alpha(),
-                                                           (TAMANHO_COMPRIMENTO_LIFE_COUNT, TAMANHO_ALTURA_LIFE_COUNT))
-        self.life_count_sprite_1 = pygame.transform.scale(pygame.image.load('./sprites/tela/vida/vida_1.png').convert_alpha(),
-                                                           (TAMANHO_COMPRIMENTO_LIFE_COUNT, TAMANHO_ALTURA_LIFE_COUNT))
-        self.life_count_sprite_0 = pygame.transform.scale(pygame.image.load('./sprites/tela/vida/vida_0.png').convert_alpha(),
-                                                           (TAMANHO_COMPRIMENTO_LIFE_COUNT, TAMANHO_ALTURA_LIFE_COUNT))
-
-        self.life_counters = [self.life_count_sprite_0, self.life_count_sprite_1,
-                              self.life_count_sprite_2, self.life_count_sprite_3]
-
-        self.life_count_atual = self.life_counters[self.lives_remaining]
 
     def update(self):
         now = pygame.time.get_ticks()
@@ -214,10 +197,8 @@ class Player(pygame.sprite.Sprite):
     def take_damage(self, amount, damage_source=None):
         if not self.invulnerable:
             self.lives_remaining -= amount
-            self.life_count_atual = self.life_counters[self.lives_remaining]
             self.invulnerable = True
             self.last_hit_time = pygame.time.get_ticks()
-            print(f"Vidas restantes: {self.lives_remaining}")
             if damage_source:
                 self.is_knocked_back = True
                 self.knockback_start_time = pygame.time.get_ticks()
@@ -233,40 +214,43 @@ class Player(pygame.sprite.Sprite):
 
             if self.lives_remaining <= 0:
                 self.lives_remaining = 0
-                print("O Jogador Morreu!")
 
     def handle_input(self, event):
         if event.type == pygame.KEYDOWN:
             if self.is_knocked_back:
                 return
-            if event.key == pygame.K_RIGHT:
+            if event.key == pygame.K_RIGHT or event.key == pygame.K_d:
                 self.direction_x = 1
                 self.walking = True
                 self.facing_right = True
                 self.direction = 'right'
-            elif event.key == pygame.K_LEFT:
+            elif event.key == pygame.K_LEFT or event.key == pygame.K_a:
                 self.direction_x = -1
                 self.walking = True
                 self.facing_right = False
                 self.direction = 'left'
-            elif event.key == pygame.K_UP:
+            elif event.key == pygame.K_UP or event.key == pygame.K_w:
                 self.direction_y = -1
                 self.walking = True
                 self.direction = 'up'
-            elif event.key == pygame.K_DOWN:
+            elif event.key == pygame.K_DOWN or event.key == pygame.K_s:
                 self.direction_y = 1
                 self.walking = True
                 self.direction = 'down'
 
         elif event.type == pygame.KEYUP:
-            if event.key == pygame.K_RIGHT and self.direction_x == 1:
-                self.direction_x = 0
-            elif event.key == pygame.K_LEFT and self.direction_x == -1:
-                self.direction_x = 0
-            elif event.key == pygame.K_UP and self.direction_y == -1:
-                self.direction_y = 0
-            elif event.key == pygame.K_DOWN and self.direction_y == 1:
-                self.direction_y = 0
+            if event.key == pygame.K_RIGHT or event.key == pygame.K_d:
+                if self.direction_x == 1:
+                    self.direction_x = 0
+            elif event.key == pygame.K_LEFT or event.key == pygame.K_a:
+                if self.direction_x == -1:
+                    self.direction_x = 0
+            elif event.key == pygame.K_UP or event.key == pygame.K_w:
+                if self.direction_y == -1:
+                    self.direction_y = 0
+            elif event.key == pygame.K_DOWN or event.key == pygame.K_s:
+                if self.direction_y == 1:
+                    self.direction_y = 0
 
             if self.direction_x == 0 and self.direction_y == 0 and not self.is_attacking:
                 self.walking = False
