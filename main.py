@@ -1,6 +1,6 @@
 import pygame
 from ghosts import Ghost
-from player import Player
+from player import Player, PLAYER_MELEE_RANGE
 from projectile import Projectile
 import random
 
@@ -61,6 +61,7 @@ ghosts_killed = 0
 
 if __name__ == "__main__":
     pygame.init()
+    pygame.mixer.init()  # Inicializa o mixer de som
 
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
     pygame.display.set_caption("O Jogo do Ceifador")
@@ -76,22 +77,47 @@ if __name__ == "__main__":
     scaled_initial_background = pygame.transform.scale(initial_background_image, (SCREEN_WIDTH, SCREEN_HEIGHT))
     initial_background_rect = scaled_initial_background.get_rect()
 
-    FONT_PATH = "./fonts/Pixel Emulator.otf"
+    game_over_background_path = "./background/GAME OVER.png"
+    game_over_background_image = pygame.image.load(game_over_background_path).convert()
+    scaled_game_over_background = pygame.transform.scale(game_over_background_image, (SCREEN_WIDTH, SCREEN_HEIGHT))
+    game_over_background_rect = scaled_game_over_background.get_rect()
+
+
+    FONT_PATH = "./fonts/PressStart2P.ttf"
     pygame.font.init()
     try:
-        font_stats = pygame.font.Font(FONT_PATH, 20)
-        font_title = pygame.font.Font(FONT_PATH, 20)
-        font_instruction = pygame.font.Font(FONT_PATH, 25)
+        font_stats = pygame.font.Font(FONT_PATH, 18)
+        font_title = pygame.font.Font(FONT_PATH, 18)
+        font_instruction = pygame.font.Font(FONT_PATH, 18)
     except pygame.error:
         print(f"Aviso: Fonte '{FONT_PATH}' não encontrada. Usando fonte padrão.")
         font_stats = pygame.font.Font(None, 38)
         font_title = pygame.font.Font(None, 76)
         font_instruction = pygame.font.Font(None, 42)
 
+    # Carrega o som de ataque
+    scythe_swoosh_sound = None
+    projectile_launch_sound = None
+    try:
+        scythe_swoosh_sound = pygame.mixer.Sound('./sounds/foice.wav') # Som da foice
+        projectile_launch_sound = pygame.mixer.Sound('./sounds/projetil.wav') # Som do lançamento do projétil
+    except pygame.error:
+        print("Aviso: Arquivo de som para foice ou projétil não encontrado. Sons de ataque não serão reproduzidos.")
+        scythe_swoosh_sound = None
+        projectile_launch_sound = None
+
     TELA_INICIAL = "TELA_INICIAL"
     JOGANDO = "JOGANDO"
     GAME_OVER = "GAME_OVER"
     game_state = TELA_INICIAL
+
+    # Menu interativo
+    menu_options = ["Iniciar jogo", "Sair"]
+    selected_option = 0
+
+    game_over_options = ["Reiniciar", "Sair"]
+    game_over_selected = 0
+
 
     GHOST_SPAWN_EVENT = pygame.USEREVENT + 1
     pygame.time.set_timer(GHOST_SPAWN_EVENT, 2000)
@@ -123,9 +149,6 @@ if __name__ == "__main__":
 
     smoke_frames = load_smoke_frames()
 
-    last_shot_time = 0
-    shot_cooldown = 1500  # ms
-
     clock = pygame.time.Clock()
 
     running = True
@@ -140,38 +163,57 @@ if __name__ == "__main__":
 
             if game_state == TELA_INICIAL:
                 if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_RETURN:
-                        inicializa_jogo(player, ghosts)
-                        game_state = JOGANDO
+                    if event.key == pygame.K_UP:
+                        selected_option = (selected_option - 1) % len(menu_options)
+                    elif event.key == pygame.K_DOWN:
+                        selected_option = (selected_option + 1) % len(menu_options)
+                    elif event.key == pygame.K_RETURN:
+                        if menu_options[selected_option] == "Iniciar jogo":
+                            inicializa_jogo(player, ghosts)
+                            game_state = JOGANDO
+                        elif menu_options[selected_option] == "Sair":
+                            running = False
 
             elif game_state == JOGANDO:
                 player.handle_input(event)
+                if event.type == pygame.KEYDOWN:
+                    if event.key == pygame.K_SPACE:
+                        # Tenta iniciar o ataque. Se for bem-sucedido (não em cooldown)...
+                        if player.attack(scythe_swoosh_sound):
+                            # Verifica se foi um ataque corpo a corpo (melee)
+                            melee_hit_occurred = False
+                            for ghost in ghosts:
+                                distance = pygame.Vector2(player.rect.center).distance_to(ghost.rect.center)
+                                if distance <= PLAYER_MELEE_RANGE:
+                                    ghost.take_damage(player.player_damage)
+                                    melee_hit_occurred = True
+                            
+                            # Se NENHUM fantasma foi atingido no corpo a corpo, lança o projétil
+                            if not melee_hit_occurred:
+                                if projectile_launch_sound:
+                                    projectile_launch_sound.play()
+                                # Calcula a posição inicial do projétil com um deslocamento
+                                offset_distance = 40
+                                proj_start_pos = pygame.Vector2(player.rect.center) + player.direction * offset_distance
+                                # Cria o projétil usando o vetor de direção do jogador
+                                proj = Projectile(proj_start_pos, player.direction, smoke_frames)
+                                projectiles.add(proj)
 
             elif game_state == GAME_OVER:
                 if event.type == pygame.KEYDOWN:
-                    if event.key == pygame.K_RETURN:
-                        inicializa_jogo(player, ghosts)
-                        game_state = JOGANDO
-                    elif event.key == pygame.K_ESCAPE:
-                        running = False
+                    if event.key == pygame.K_UP:
+                        game_over_selected = (game_over_selected - 1) % len(game_over_options)
+                    elif event.key == pygame.K_DOWN:
+                        game_over_selected = (game_over_selected + 1) % len(game_over_options)
+                    elif event.key == pygame.K_RETURN:
+                        if game_over_options[game_over_selected] == "Reiniciar":
+                            inicializa_jogo(player, ghosts)
+                            game_state = JOGANDO
+                        elif game_over_options[game_over_selected] == "Sair":
+                            running = False
+
 
         if game_state == JOGANDO:
-            # Disparo automático do projetil
-            if current_time - last_shot_time >= shot_cooldown:
-                last_shot_time = current_time
-                x, y = player.rect.center
-                offset = 60  
-                if player.direction == 'right':
-                    x += offset
-                elif player.direction == 'left':
-                    x -= offset
-                elif player.direction == 'up':
-                    y -= offset
-                elif player.direction == 'down':
-                    y += offset
-                proj = Projectile((x, y), player.direction, smoke_frames)
-                projectiles.add(proj)
-
             projectiles.update()
 
             # Colisão projetil x fantasmas
@@ -181,15 +223,19 @@ if __name__ == "__main__":
                     for ghost in hits:
                         ghost.take_damage(1)
                         if ghost.lives_remaining <= 0:
-                            ghosts_killed += 1  # incrementa contador
+                            ghosts_killed += 1
                     proj.kill()
 
         # Desenha telas
         if game_state == TELA_INICIAL:
             screen.blit(scaled_initial_background, initial_background_rect)
-            instrucao_surface = font_instruction.render("Pressione ENTER para começar", True, (38, 56, 48))
-            instrucao_rect = instrucao_surface.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
-            screen.blit(instrucao_surface, instrucao_rect)
+            menu_y_start = 340
+            for i, option in enumerate(menu_options):
+                color = (102, 137, 119) if i == selected_option else (102, 137, 119)
+                prefix = "→ " if i == selected_option else "   "
+                option_surface = font_instruction.render(prefix + option, True, color)
+                option_rect = option_surface.get_rect(center=(SCREEN_WIDTH // 2, menu_y_start + i * 40))
+                screen.blit(option_surface, option_rect)
 
         elif game_state == JOGANDO:
             screen.blit(scaled_background, background_rect)
@@ -213,24 +259,23 @@ if __name__ == "__main__":
                 game_state = GAME_OVER
 
         elif game_state == GAME_OVER:
-            screen.blit(scaled_initial_background, initial_background_rect)
+            screen.blit(scaled_game_over_background, game_over_background_rect)
 
-            game_over_surface = font_title.render("GAME OVER", True, (38, 56, 48))
-            instrucao_restart_surface = font_instruction.render("ENTER para reiniciar", True, (38, 56, 48))
-            instrucao_sair_surface = font_stats.render("ESC para sair", True, (38, 56, 48))
-
+            # Texto de fantasmas mortos
             kill_count_text = f"Você matou {ghosts_killed} fantasmas"
-            kill_count_surface = font_stats.render(kill_count_text, True, (38, 56, 48))
-
-            game_over_rect = game_over_surface.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 3))
-            instrucao_restart_rect = instrucao_restart_surface.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
-            instrucao_sair_rect = instrucao_sair_surface.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 60))
-            kill_count_rect = kill_count_surface.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 40))
-
-            screen.blit(game_over_surface, game_over_rect)
+            kill_count_surface = font_stats.render(kill_count_text, True, (102, 137, 119))
+            kill_count_rect = kill_count_surface.get_rect(center=(SCREEN_WIDTH // 2, 300))
             screen.blit(kill_count_surface, kill_count_rect)
-            screen.blit(instrucao_restart_surface, instrucao_restart_rect)
-            screen.blit(instrucao_sair_surface, instrucao_sair_rect)
+
+            # Menu com flechinha
+            menu_y_start = 340
+            for i, option in enumerate(game_over_options):
+                color = (102, 137, 119)
+                prefix = "→ " if i == game_over_selected else "   "
+                option_surface = font_instruction.render(prefix + option, True, color)
+                option_rect = option_surface.get_rect(center=(SCREEN_WIDTH // 2, menu_y_start + i * 40))
+                screen.blit(option_surface, option_rect)
+
 
         pygame.display.flip()
         clock.tick(FPS)

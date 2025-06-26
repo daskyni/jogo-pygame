@@ -1,49 +1,42 @@
 import pygame
+import math
 
 class Projectile(pygame.sprite.Sprite):
-    def __init__(self, pos, direction, smoke_sprites):
+    def __init__(self, pos, direction_vector, smoke_sprites):
         super().__init__()
 
         scale_factor = 3 
         
         # Redimensiona os sprites da fumaça
-        scaled_sprites = [
+        original_scaled_sprites = [
             pygame.transform.scale(
                 img,
                 (img.get_width() * scale_factor, img.get_height() * scale_factor)
             ) for img in smoke_sprites
         ]
 
-        # Ajusta sprites conforme direção
-        if direction == 'left':
-            scaled_sprites = [pygame.transform.flip(img, True, False) for img in scaled_sprites]
-        elif direction == 'up':
-            scaled_sprites = [pygame.transform.rotate(img, 90) for img in scaled_sprites]
-        elif direction == 'down':
-            scaled_sprites = [pygame.transform.rotate(img, -90) for img in scaled_sprites]
+        # Rotaciona os sprites com base no vetor de direção
+        # O sprite original aponta para a direita (ângulo 0)
+        # Usamos math.atan2 para um cálculo de ângulo mais robusto.
+        # O Y é invertido (-direction_vector.y) por causa do sistema de coordenadas do Pygame.
+        angle = math.degrees(math.atan2(-direction_vector.y, direction_vector.x))
+        scaled_sprites = [pygame.transform.rotate(img, angle) for img in original_scaled_sprites]
 
         self.smoke_sprites = scaled_sprites
         self.frame_index = 0
         self.animation_speed = 0.2
         self.frame_counter = 0
         self.speed = 8
-        self.direction = direction
+        self.direction = direction_vector
         self.image = self.smoke_sprites[self.frame_index]
-        self.rect = self.image.get_rect(center=pos)
         self.rect = self.image.get_rect(center=pos)
 
         self.hitbox = self.rect.inflate(-self.rect.width * 0.5, -self.rect.height * 0.3)
 
     def update(self):
-        # Movimento conforme direção
-        if self.direction == 'right':
-            self.rect.x += self.speed
-        elif self.direction == 'left':
-            self.rect.x -= self.speed
-        elif self.direction == 'up':
-            self.rect.y -= self.speed
-        elif self.direction == 'down':
-            self.rect.y += self.speed
+        # Movimento com base no vetor de direção
+        self.rect.x += self.direction.x * self.speed
+        self.rect.y += self.direction.y * self.speed
         
         # Atualiza a hitbox junto com o rect
         self.hitbox.center = self.rect.center

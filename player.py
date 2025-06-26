@@ -3,6 +3,7 @@ import pygame
 
 PLAYER_TOTAL_LIVES = 3
 PLAYER_INVULNERABILITY_DURATION = 1000
+PLAYER_MELEE_RANGE = 70 # Distância para ataque corpo a corpo
 PLAYER_ATTACK_DURATION = 500
 PLAYER_ATTACK_COOLDOWN = 1500
 PLAYER_KNOCKBACK_DURATION = 200
@@ -72,7 +73,7 @@ class Player(pygame.sprite.Sprite):
         self.direction_x = 0
         self.direction_y = 0
         self.facing_right = True
-        self.direction = 'right'  # Direção atual para disparo
+        self.direction = pygame.Vector2(1, 0)  # Direção atual para disparo
 
         self.total_lives = PLAYER_TOTAL_LIVES
         self.lives_remaining = self.total_lives
@@ -97,6 +98,14 @@ class Player(pygame.sprite.Sprite):
     def update(self):
         now = pygame.time.get_ticks()
 
+        # Atualiza o vetor de direção com base no estado do movimento
+        # Isso garante que a direção para o projétil esteja sempre correta.
+        if self.direction_x != 0 or self.direction_y != 0:
+            self.direction.x = self.direction_x
+            self.direction.y = self.direction_y
+            if self.direction.length_squared() > 0: # Evita normalizar um vetor nulo
+                self.direction.normalize_ip()
+
         if self.is_knocked_back:
             if now - self.knockback_start_time < PLAYER_KNOCKBACK_DURATION:
                 self.rect.x += self.knockback_direction.x * PLAYER_KNOCKBACK_SPEED
@@ -110,12 +119,6 @@ class Player(pygame.sprite.Sprite):
             self.rect.y += self.direction_y * self.speed
 
         self.rect.clamp_ip(pygame.Rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT))
-
-        if not self.is_knocked_back and not self.is_attacking and (now - self.last_attack_time > self.attack_cooldown):
-            self.is_attacking = True
-            self.attack_timer = now
-            self.last_attack_time = now
-            self.current_attack_frame = 0
 
         if self.is_attacking:
             self.animate_attack()
@@ -194,6 +197,18 @@ class Player(pygame.sprite.Sprite):
                 self.image = base_image
                 self.update_hitbox(False)
 
+    def attack(self, scythe_sound):
+        now = pygame.time.get_ticks()
+        if not self.is_attacking and (now - self.last_attack_time > self.attack_cooldown):
+            self.is_attacking = True
+            self.attack_timer = now
+            self.last_attack_time = now
+            self.current_attack_frame = 0
+            if scythe_sound:
+                scythe_sound.play()
+            return True # Ataque iniciado com sucesso
+        return False # Ataque em cooldown ou já atacando
+
     def take_damage(self, amount, damage_source=None):
         if not self.invulnerable:
             self.lives_remaining -= amount
@@ -223,20 +238,16 @@ class Player(pygame.sprite.Sprite):
                 self.direction_x = 1
                 self.walking = True
                 self.facing_right = True
-                self.direction = 'right'
             elif event.key == pygame.K_LEFT or event.key == pygame.K_a:
                 self.direction_x = -1
                 self.walking = True
                 self.facing_right = False
-                self.direction = 'left'
             elif event.key == pygame.K_UP or event.key == pygame.K_w:
                 self.direction_y = -1
                 self.walking = True
-                self.direction = 'up'
             elif event.key == pygame.K_DOWN or event.key == pygame.K_s:
                 self.direction_y = 1
                 self.walking = True
-                self.direction = 'down'
 
         elif event.type == pygame.KEYUP:
             if event.key == pygame.K_RIGHT or event.key == pygame.K_d:
