@@ -64,7 +64,7 @@ if __name__ == "__main__":
     pygame.mixer.init()  # Inicializa o mixer de som
 
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-    pygame.display.set_caption("O Jogo do Ceifador")
+    pygame.display.set_caption("Death Quest")
 
     background_image_path = "./sprites/mapa/mapa.png"
     background_image = pygame.image.load(background_image_path).convert()
@@ -178,8 +178,9 @@ if __name__ == "__main__":
                 player.handle_input(event)
                 if event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_SPACE:
-                        # Tenta iniciar o ataque. Se for bem-sucedido (não em cooldown)...
-                        if player.attack(scythe_swoosh_sound):
+                        # Tenta iniciar o ataque.
+                        attack_successful, attack_direction = player.attack(scythe_swoosh_sound)
+                        if attack_successful:
                             # Verifica se foi um ataque corpo a corpo (melee)
                             melee_hit_occurred = False
                             for ghost in ghosts:
@@ -194,9 +195,8 @@ if __name__ == "__main__":
                                     projectile_launch_sound.play()
                                 # Calcula a posição inicial do projétil com um deslocamento
                                 offset_distance = 40
-                                proj_start_pos = pygame.Vector2(player.rect.center) + player.direction * offset_distance
-                                # Cria o projétil usando o vetor de direção do jogador
-                                proj = Projectile(proj_start_pos, player.direction, smoke_frames)
+                                proj_start_pos = pygame.Vector2(player.rect.center) + attack_direction * offset_distance
+                                proj = Projectile(proj_start_pos, attack_direction.copy(), smoke_frames)
                                 projectiles.add(proj)
 
             elif game_state == GAME_OVER:

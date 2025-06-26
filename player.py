@@ -5,7 +5,7 @@ PLAYER_TOTAL_LIVES = 3
 PLAYER_INVULNERABILITY_DURATION = 1000
 PLAYER_MELEE_RANGE = 70 # Distância para ataque corpo a corpo
 PLAYER_ATTACK_DURATION = 500
-PLAYER_ATTACK_COOLDOWN = 1500
+PLAYER_ATTACK_COOLDOWN = 1200
 PLAYER_KNOCKBACK_DURATION = 200
 PLAYER_KNOCKBACK_SPEED = 5
 PLAYER_DAMAGE = 1
@@ -206,8 +206,8 @@ class Player(pygame.sprite.Sprite):
             self.current_attack_frame = 0
             if scythe_sound:
                 scythe_sound.play()
-            return True # Ataque iniciado com sucesso
-        return False # Ataque em cooldown ou já atacando
+            return True, self.direction # Ataque iniciado com sucesso
+        return False, None # Ataque em cooldown ou já atacando
 
     def take_damage(self, amount, damage_source=None):
         if not self.invulnerable:
