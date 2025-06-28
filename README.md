@@ -1,5 +1,9 @@
 # Death Quest
 Grupo: Danielle Werutsky, Francielli Andreghetto e Matthäus Campanher
+## Como instalar
+Para jogar, precisam estar instalados na máquina: Python e Pygame.
+- Na instalação do Python, ativar a opção de instalar o pip.
+- Para instalar o Pygame, rodar o seguinte trecho no terminal: py - m pip install - U pygame -- usuário
 ## Sobre
 Em Death Quest você controla uma entidade responsável (o Ceifador) por mandar os fantasmas malvados de volta para as suas lápides! O seu objetivo é derrotar o máximo possível de fantasmas antes que você tenha um trágico fim.
 ## Como jogar?
